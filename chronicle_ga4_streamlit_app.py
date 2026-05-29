@@ -32,7 +32,12 @@ st.markdown(
     """
     <style>
     /* Hide Streamlit/Base Web's multiselect bulk-selection row. */
-    div[data-baseweb="popover"] ul[role="listbox"] li:first-child {
+    div[data-baseweb="popover"] li[role="option"][aria-selected="false"]:has(div[aria-checked="false"]) {
+        display: none;
+    }
+
+    /* Fallback for Streamlit versions where the bulk row is rendered as the first option. */
+    div[data-baseweb="popover"] [role="listbox"] > div:first-child {
         display: none;
     }
     </style>
