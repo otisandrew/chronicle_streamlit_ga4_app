@@ -210,7 +210,7 @@ def build_chart(
                 #"title": "Value",
                 "tickformat": ".1%" if shared_rate_format else ",.0f",
                 "rangemode": "tozero",
-                "showgrid": False,
+                "showgrid": True,
             },
         )
 
@@ -235,7 +235,11 @@ with st.sidebar:
     use_monthly_data = st.checkbox(
         "Use monthly data",
         value=False,
-        help="Leave unchecked for daily data. Check to load the monthly CSV from this repo.",
+        help=(
+            "Leave unchecked for daily data. Check for monthly data. "
+            "Note: Daily user values cannot be summed into monthly values because "
+            "GA4 deduplicates users that visit over multiple days."
+        ),
     )
 
     data_frequency = "Monthly" if use_monthly_data else "Daily"
