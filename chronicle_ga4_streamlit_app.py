@@ -103,12 +103,17 @@ def build_chart(
     frac: float,
     chart_mode: str,
     show_raw_values: bool,
+    smooth_values: bool,
 ) -> go.Figure:
     """Build a single-axis or dual-axis Plotly chart."""
     fig = go.Figure()
 
-    smoothed_metrics = {
-        metric: smooth_metric(df, metric, frac)
+    chart_metrics = {
+        metric: (
+            smooth_metric(df, metric, frac)
+            if smooth_values
+            else pd.to_numeric(df[metric], errors="coerce")
+        )
         for metric in metrics
     }
 
@@ -140,7 +145,7 @@ def build_chart(
         fig.add_trace(
             go.Scatter(
                 x=df["Date"],
-                y=smoothed_metrics[left_metric],
+                y=chart_metrics[left_metric],
                 mode="lines",
                 name=f"{left_metric}",
                 yaxis="y",
@@ -150,7 +155,7 @@ def build_chart(
         fig.add_trace(
             go.Scatter(
                 x=df["Date"],
-                y=smoothed_metrics[right_metric],
+                y=chart_metrics[right_metric],
                 mode="lines",
                 name=f"{right_metric}",
                 yaxis="y2",
@@ -189,7 +194,7 @@ def build_chart(
             fig.add_trace(
                 go.Scatter(
                     x=df["Date"],
-                    y=smoothed_metrics[metric],
+                    y=chart_metrics[metric],
                     mode="lines",
                     name=f"{metric}",
                     line={"width": 3},
@@ -233,15 +238,7 @@ with st.sidebar:
     data_frequency = "Monthly" if use_monthly_data else "Daily"
     default_csv_path = MONTHLY_CSV_PATH if use_monthly_data else DAILY_CSV_PATH
 
-    csv_path_or_url = st.text_input(
-        "CSV path or raw GitHub URL",
-        value=default_csv_path,
-        key=f"csv_path_or_url_{data_frequency.lower()}",
-        help=(
-            "For GitHub, use the raw CSV URL. If the CSV is in the same repo as this app, "
-            "leave the default filename."
-        ),
-    )
+    csv_path_or_url = default_csv_path
 
 try:
     data = load_data(csv_path_or_url)
@@ -293,14 +290,19 @@ with st.sidebar:
         ),
     )
 
-    frac = st.slider(
-        "Smoothing level",
-        min_value=0.01,
-        max_value=1.00,
-        value=0.10,
-        step=0.01,
-        help=f"Lower values track {data_frequency.lower()} movement more closely; higher values create a smoother trend.",
-    )
+    smooth_values = not use_monthly_data
+
+    if smooth_values:
+        frac = st.slider(
+            "Smoothing level",
+            min_value=0.01,
+            max_value=1.00,
+            value=0.10,
+            step=0.01,
+            help="Lower values track daily movement more closely; higher values create a smoother trend.",
+        )
+    else:
+        frac = 0.10
 
     default_start = max(min_date, (pd.Timestamp(max_date) - DateOffset(years=1)).date())
 
@@ -312,10 +314,13 @@ with st.sidebar:
         help="The end date defaults to the most recent date in the CSV.",
     )
 
-    show_raw_values = st.checkbox(
-        f"Show raw {data_frequency.lower()} values behind smoothed lines",
-        value=False,
-    )
+    if smooth_values:
+        show_raw_values = st.checkbox(
+            "Show raw daily values behind smoothed lines",
+            value=False,
+        )
+    else:
+        show_raw_values = False
 
 if chart_mode == "Dual axis" and len(selected_metrics) != 2:
     st.warning("Select exactly two metrics for a dual-axis chart.")
@@ -348,6 +353,7 @@ fig = build_chart(
     frac=frac,
     chart_mode=chart_mode,
     show_raw_values=show_raw_values,
+    smooth_values=smooth_values,
 )
 
 st.plotly_chart(fig, use_container_width=True)
