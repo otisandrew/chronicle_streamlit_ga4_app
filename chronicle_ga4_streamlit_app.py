@@ -168,6 +168,7 @@ def build_chart(
                 "title": left_metric,
                 "tickformat": metric_tick_format(left_metric),
                 "rangemode": "tozero",
+                "showgrid": False,
             },
             yaxis2={
                 "title": right_metric,
@@ -175,6 +176,7 @@ def build_chart(
                 "overlaying": "y",
                 "side": "right",
                 "rangemode": "tozero",
+                "showgrid": False,
             },
         )
 
@@ -208,6 +210,7 @@ def build_chart(
                 #"title": "Value",
                 "tickformat": ".1%" if shared_rate_format else ",.0f",
                 "rangemode": "tozero",
+                "showgrid": False,
             },
         )
 
@@ -306,13 +309,50 @@ with st.sidebar:
 
     default_start = max(min_date, (pd.Timestamp(max_date) - DateOffset(years=1)).date())
 
-    start_date, end_date = st.date_input(
-        "Date range",
-        value=(default_start, max_date),
-        min_value=min_date,
-        max_value=max_date,
-        help="The end date defaults to the most recent date in the CSV.",
-    )
+    if use_monthly_data:
+        month_options = sorted(data["Date"].dt.to_period("M").unique())
+        month_labels = [month.strftime("%B %Y") for month in month_options]
+
+        default_end_idx = len(month_options) - 1
+        default_start_period = pd.Timestamp(default_start).to_period("M")
+        default_start_idx = max(
+            0,
+            next(
+                (idx for idx, month in enumerate(month_options) if month >= default_start_period),
+                0,
+            ),
+        )
+
+        start_month_label = st.selectbox(
+            "Start month",
+            month_labels,
+            index=default_start_idx,
+        )
+
+        end_month_label = st.selectbox(
+            "End month",
+            month_labels,
+            index=default_end_idx,
+        )
+
+        start_month = month_options[month_labels.index(start_month_label)]
+        end_month = month_options[month_labels.index(end_month_label)]
+
+        if start_month > end_month:
+            st.warning("Start month must be before or equal to end month.")
+            st.stop()
+
+        start_date = start_month.start_time.date()
+        end_date = end_month.end_time.date()
+
+    else:
+        start_date, end_date = st.date_input(
+            "Date range",
+            value=(default_start, max_date),
+            min_value=min_date,
+            max_value=max_date,
+            help="The end date defaults to the most recent date in the CSV.",
+        )
 
     if smooth_values:
         show_raw_values = st.checkbox(
@@ -339,11 +379,19 @@ if filtered.empty:
     st.warning("No rows are available for the selected date range.")
     st.stop()
 
-latest_available = data["Date"].max().strftime("%B %d, %Y").replace(" 0", " ")
+if use_monthly_data:
+    latest_available = data["Date"].max().strftime("%B %Y")
+    start_display = pd.Timestamp(start_date).strftime("%B %Y")
+    end_display = pd.Timestamp(end_date).strftime("%B %Y")
+else:
+    latest_available = data["Date"].max().strftime("%B %d, %Y").replace(" 0", " ")
+    start_display = start_date.strftime("%B %d, %Y").replace(" 0", " ")
+    end_display = end_date.strftime("%B %d, %Y").replace(" 0", " ")
+
 st.write(
     f"Showing **{data_frequency.lower()}** data from "
-    f"**{start_date.strftime('%B %d, %Y').replace(' 0', ' ')}** "
-    f"through **{end_date.strftime('%B %d, %Y').replace(' 0', ' ')}**. "
+    f"**{start_display}** "
+    f"through **{end_display}**. "
     f"Latest date available: **{latest_available}**."
 )
 
