@@ -28,6 +28,18 @@ st.set_page_config(
     layout="wide",
 )
 
+st.markdown(
+    """
+    <style>
+    /* Hide Streamlit/Base Web's multiselect bulk-selection row. */
+    div[data-baseweb="popover"] ul[role="listbox"] li:first-child {
+        display: none;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 @st.cache_data(show_spinner=False)
 def load_data(csv_path_or_url: str) -> pd.DataFrame:
     """Load the GA4 CSV and normalize the Date column."""
