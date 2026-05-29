@@ -346,13 +346,58 @@ with st.sidebar:
         end_date = end_month.end_time.date()
 
     else:
-        start_date, end_date = st.date_input(
+        date_range_preset = st.selectbox(
             "Date range",
-            value=(default_start, max_date),
-            min_value=min_date,
-            max_value=max_date,
-            help="The end date defaults to the most recent date in the CSV.",
+            options=[
+                "Past 7 days",
+                "Past 30 days",
+                "Past 3 months",
+                "Past 6 months",
+                "Past year",
+                "All time",
+                "Custom",
+            ],
+            index=4,
+            help="Preset ranges are anchored to the most recent date in the CSV, not today's date.",
         )
+
+        if date_range_preset == "Past 7 days":
+            start_date = max(min_date, (pd.Timestamp(max_date) - DateOffset(days=6)).date())
+            end_date = max_date
+        elif date_range_preset == "Past 30 days":
+            start_date = max(min_date, (pd.Timestamp(max_date) - DateOffset(days=29)).date())
+            end_date = max_date
+        elif date_range_preset == "Past 3 months":
+            start_date = max(min_date, (pd.Timestamp(max_date) - DateOffset(months=3)).date())
+            end_date = max_date
+        elif date_range_preset == "Past 6 months":
+            start_date = max(min_date, (pd.Timestamp(max_date) - DateOffset(months=6)).date())
+            end_date = max_date
+        elif date_range_preset == "Past year":
+            start_date = default_start
+            end_date = max_date
+        elif date_range_preset == "All time":
+            start_date = min_date
+            end_date = max_date
+        else:
+            start_date = st.date_input(
+                "Start date",
+                value=default_start,
+                min_value=min_date,
+                max_value=max_date,
+                help="Dates cannot be later than the most recent date in the CSV.",
+            )
+            end_date = st.date_input(
+                "End date",
+                value=max_date,
+                min_value=min_date,
+                max_value=max_date,
+                help="Dates cannot be later than the most recent date in the CSV.",
+            )
+
+            if start_date > end_date:
+                st.warning("Start date must be before or equal to end date.")
+                st.stop()
 
     if smooth_values:
         show_raw_values = st.checkbox(
