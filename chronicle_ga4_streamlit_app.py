@@ -27,19 +27,6 @@ st.set_page_config(
     page_icon="📈",
     layout="wide",
 )
-
-st.markdown(
-    """
-    <style>
-    /* Hide Streamlit/Base Web's multiselect bulk-selection row. */
-    div[data-baseweb="popover"] [role="listbox"] [role="option"]:first-child {
-        display: none !important;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
-
 @st.cache_data(show_spinner=False)
 def load_data(csv_path_or_url: str) -> pd.DataFrame:
     """Load the GA4 CSV and normalize the Date column."""
@@ -298,16 +285,75 @@ with st.sidebar:
         else default_single_axis_metrics or metric_columns[:max_metrics]
     )
 
-    selected_metrics = st.multiselect(
+    metrics_state_key = "selected_metrics"
+    metrics_mode_key = "selected_metrics_chart_mode"
+    metric_picker_reset_key = "metric_picker_reset"
+
+    if (
+        metrics_state_key not in st.session_state
+        or st.session_state.get(metrics_mode_key) != chart_mode
+    ):
+        st.session_state[metrics_state_key] = default_metrics[:max_metrics]
+        st.session_state[metrics_mode_key] = chart_mode
+        st.session_state[metric_picker_reset_key] = (
+            st.session_state.get(metric_picker_reset_key, 0) + 1
+        )
+
+    st.session_state[metrics_state_key] = [
+        metric
+        for metric in st.session_state[metrics_state_key]
+        if metric in metric_columns
+    ][:max_metrics]
+
+    selected_metrics = st.session_state[metrics_state_key]
+    available_metrics = [
+        metric for metric in metric_columns if metric not in selected_metrics
+    ]
+
+    add_metric_disabled = len(selected_metrics) >= max_metrics or not available_metrics
+
+    metric_to_add = st.selectbox(
         "Metrics",
-        options=metric_columns,
-        default=default_metrics,
-        max_selections=max_metrics,
+        options=available_metrics,
+        index=None,
+        placeholder=(
+            "Maximum metrics selected"
+            if len(selected_metrics) >= max_metrics
+            else "Search and add a metric"
+        ),
         help=(
             "Dual axis charts are limited to two metrics. "
             "Single axis charts are limited to seven metrics."
         ),
+        disabled=add_metric_disabled,
+        key=f"metric_picker_{st.session_state[metric_picker_reset_key]}",
     )
+
+    if metric_to_add:
+        st.session_state[metrics_state_key].append(metric_to_add)
+        st.session_state[metric_picker_reset_key] += 1
+        st.rerun()
+
+    if selected_metrics:
+        st.caption("Selected metrics")
+
+        for metric in selected_metrics:
+            metric_label_col, remove_metric_col = st.columns([0.85, 0.15])
+            metric_label_col.write(metric)
+
+            if remove_metric_col.button(
+                "×",
+                key=f"remove_metric_{metric}",
+                help=f"Remove {metric}",
+            ):
+                st.session_state[metrics_state_key] = [
+                    selected_metric
+                    for selected_metric in selected_metrics
+                    if selected_metric != metric
+                ]
+                st.rerun()
+    else:
+        st.caption("No metrics selected.")
 
     smooth_values = not use_monthly_data
 
